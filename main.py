@@ -16,7 +16,7 @@ parser.add_argument('--val_batch_size', type=int, default=512)
 parser.add_argument('--embed_dim', type=int, default=128)
 parser.add_argument('--lr', type=float, default=0.0002)
 parser.add_argument('--k', type=int, default=300)
-parser.add_argument('--dropout_rate', type=float, default=0.1)
+parser.add_argument('--dropout_rate', type=float, default=0.0)
 parser.add_argument('--margin', type=float, default=0.1)
 parser.add_argument('--lambda_dist', type=float, default=0.2)
 parser.add_argument('--lambda_orthog', type=float, default=0.0)
@@ -26,6 +26,7 @@ parser.add_argument('--max_position', type=int, default=50)
 parser.add_argument('--t0', type=float, default=3.0)
 parser.add_argument('--te', type=float, default=0.01)
 parser.add_argument('--num_epoch', type=int, default=500)
+parser.add_argument('--repetitive', type=bool, default=False)
 args = parser.parse_args()
 
 dataset = args.dataset
@@ -44,6 +45,7 @@ E = args.E
 patience = args.patience
 t0 = args.t0
 te = args.te
+repetitive = args.repetitive
 
 K = [5, 10, 20]
 
@@ -57,9 +59,9 @@ def main():
 
     num_items = train_data['itemId'].max() + 1
     
-    train_iid, train_length, train_label = preprocess(train_data, train=True)
-    val_iid, val_length, val_label = preprocess(val_data, train=False)
-    test_iid, test_length, test_label = preprocess(test_data, train=False)
+    train_iid, train_length, train_label = preprocess(train_data, repetitive, train=True)
+    val_iid, val_length, val_label = preprocess(val_data, repetitive, train=False)
+    test_iid, test_length, test_label = preprocess(test_data, repetitive, train=False)
 
     train_data = zip(train_iid, train_length, train_label)
     val_data = zip(val_iid, val_length, val_label)
@@ -73,6 +75,7 @@ def main():
     best_epoch = 0
     
     for epoch in range(0, num_epoch):
+        print('')
         print "Epoch: " + str(epoch)
 
         random.shuffle(train_data)
@@ -84,6 +87,7 @@ def main():
 
         recalls, mrrs = validate(val_data, model, K, tau)
 
+        print('')
         print('Validation data:')
         print('Recall@5 : ' + str(round(recalls[0], 4)) + ', MRR@5 : ' + str(round(mrrs[0], 4)))
         print('Recall@10: ' + str(round(recalls[1], 4)) + ', MRR@10: ' + str(round(mrrs[1], 4)))
@@ -97,10 +101,12 @@ def main():
 
             test_recalls, test_mrrs = validate(test_data, model, K, tau)
 
+            print('')
             print('Best Recall@5 : ' + str(round(best_recalls[0], 4)) + ', Best MRR@5 : ' + str(round(best_mrrs[0], 4)))
             print('Best Recall@10: ' + str(round(best_recalls[1], 4)) + ', Best MRR@10: ' + str(round(best_mrrs[1], 4)))
             print('Best Recall@20: ' + str(round(best_recalls[2], 4)) + ', Best MRR@20: ' + str(round(best_mrrs[2], 4)))
 
+            print('')
             print('### Test Recall@5 : ' + str(round(test_recalls[0], 4)) + ', Test MRR@5 : ' + str(round(test_mrrs[0], 4)))
             print('### Test Recall@10: ' + str(round(test_recalls[1], 4)) + ', Test MRR@10: ' + str(round(test_mrrs[1], 4)))
             print('### Test Recall@20: ' + str(round(test_recalls[2], 4)) + ', Test MRR@20: ' + str(round(test_mrrs[2], 4)))
@@ -137,8 +143,11 @@ def train_model(train_data, model, optimizer, batch_size, tau):
         target_flatten = target.view(-1) 
         sess_cum = sess.repeat(1, max_length).view(-1, max_length) * torch.tril(torch.ones((max_length, max_length), device=device), diagonal=0).repeat(sess.shape[0], 1).to(torch.long)
         length3 = (torch.sum(sess_cum != 0, dim=1) >= 3).to(device)
-        unseen_item = torch.sum((sess_cum - target_flatten.view(-1, 1)).eq(0), dim=1).eq(0).to(device)
-        valid = (length3 & unseen_item)
+        if repetitive:
+            valid = length3
+        else:
+            unseen_item = torch.sum((sess_cum - target_flatten.view(-1, 1)).eq(0), dim=1).eq(0).to(device)
+            valid = (length3 & unseen_item)
         valid_ind = valid.nonzero().squeeze()
 
         valid_target = target_flatten[valid_ind]
@@ -189,12 +198,16 @@ def validate(val_data, model, K, tau):
             length = torch.tensor(length).to(device)
             
             length3 = (torch.sum(sess != 0, dim=1) >= 3).to(device)
-            unseen_item = torch.sum((sess - target.view(-1, 1)).eq(0), dim=1).eq(0).to(device)
-            valid = (length3 & unseen_item)
+            if repetitive:
+                valid = length3
+            else:
+                unseen_item = torch.sum((sess - target.view(-1, 1)).eq(0), dim=1).eq(0).to(device)
+                valid = (length3 & unseen_item)
             target *= torch.tensor(valid).to(torch.long).to(device)
             distance = model(sess, length, tau, valid, train=False)
 
-            distance[range(len(distance)), sess.t()] = float('inf')
+            if not repetitive:
+                distance[range(len(distance)), sess.t()] = float('inf')
             distance[:, 0] = float('inf')
             len_val += torch.sum(valid).item()
             valid_ind = valid.nonzero().squeeze()

@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 
 max_length = 50
-def preprocess(data, train=False):
+def preprocess(data, repetitive, train=False):
     sid = list(data['sessionId'])
     iid = list(data['itemId'])
     data = []
@@ -35,7 +35,7 @@ def preprocess(data, train=False):
 
         else:
             for ind in range(3, len(session)):
-                if session[ind] in session[:ind]:
+                if not repetitive and session[ind] in session[:ind]:
                     continue
                 if ind > max_length:
                     break
