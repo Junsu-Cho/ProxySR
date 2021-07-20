@@ -24,10 +24,10 @@ Settings for training and evaluating ProxySR. Please refer to our paper for deta
 * \-\-repetitive: (True) Next item recommendation with repetitive consumption or (False) Next unseen item recommendation.
 
 ## How to train and test a model on Diginetica dataset (next unseen item recommendation)
-    python main.py --dataset diginetica
+    python main.py --dataset=diginetica
     
 ## How to train and test a model on Diginetica dataset (item recommendation with repetitive consumption)
-    python main.py --dataset diginetica --repetitive=True
+    python main.py --dataset=diginetica --repetitive=True
 
 ## Reference
 * ### [Unsupervised Proxy Selection for Session-based Recommender Systems (SIGIR'21)](#)
