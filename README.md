@@ -3,6 +3,10 @@ ProxySR
 
 This is a PyTorch Implementation of ProxySR, proposed in "Unsupervised Proxy Selection for Session-based Recommender Systems", SIGIR'21.
 
+## Requirements
+* Python2
+* PyTorch 1.0.1 or higher
+
 ## Configuation
 Settings for training and evaluating ProxySR. Please refer to our paper for detailed description of each configuration. 
 * \-\-dataset: Dataset. ex) diginetica
